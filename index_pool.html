@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<!--
+  Billard-Turnier — Standalone-Scoreboard (8-/9-/10-Ball)
+  Copyright (c) 2026 Matthias Haas
+  SPDX-License-Identifier: MIT
+  Lizenz: MIT — siehe LICENSE im selben Ordner (https://opensource.org/licenses/MIT)
+-->
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<title>8/9/10-Ball Scoreboard – Standalone</title>
+
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #dddddd;
+    overflow: hidden;
+    touch-action: manipulation;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header (Grid wie 14.1: links Demo+Hilfe, Mitte Titel, rechts Neues Match+Uhr) */
+  #header {
+    background: #1f3b73;
+    color: white;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1vmin;
+    padding: 0.8vmin 2vmin;
+    font-weight: bold;
+  }
+  #hdr-title { font-size: 4vmin; text-align: center; white-space: nowrap; }
+  .hdr-left  { display: flex; align-items: center; gap: 2vmin;   justify-self: start; }
+  .hdr-right { display: flex; align-items: center; gap: 1.5vmin; justify-self: end; }
+  #clock { font-size: 3vmin; font-weight: bold; }
+  #home-btn {
+    font-size: 3vmin; line-height: 1;
+    padding: 0.4vmin 1.2vmin; margin: 0;
+    border: none; border-radius: 1vmin;
+    background: rgba(255,255,255,0.15);
+    color: #fff; cursor: pointer;
+  }
+  /* Hilfe / Neues Match in der Kopfzeile (kompakt, helleres Blau, wie 14.1) */
+  .hdr-btn {
+    font-size: 2.4vmin;
+    line-height: 1;
+    padding: 0.6vmin 1.4vmin;
+    margin: 0;
+    border: none;
+    border-radius: 1vmin;
+    background: #3461a8;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* Break-Anzeige */
+  #break-info { text-align: center; font-size: 4vmin; font-weight: bold; margin-top: 1vmin; }
+  #break-text { color: red; }
+
+  /* Ausspielziel (Race to) – Optik wie 14.1-Ziel */
+  #pool-target { text-align: center; font-size: 3vmin; font-weight: bold; margin-top: 0.4vmin; }
+  #pool-target button { font-size: 2.5vmin; margin: 0 0 0 1vmin; padding: 0.8vmin 1.8vmin;
+    border-radius: 0.8vmin; border: 1px solid #666; background: #f0f0f0; cursor: pointer; }
+
+  /* Gewinner-Einblendung (Race-to erreicht) */
+  #confirm-panel { display: none; position: fixed; left: 50%; top: 6.5vh; transform: translateX(-50%);
+    z-index: 90; text-align: center; background: #fff7e6; border: 0.3vmin solid #e67e22;
+    border-radius: 1.2vmin; padding: 1.2vmin 2.5vmin; box-shadow: 0 0.5vmin 2vmin rgba(0,0,0,0.35); max-width: 92vw; }
+  #confirm-text { font-size: 2.8vmin; font-weight: bold; color: #1f3b73; margin-bottom: 0.6vmin; }
+  #confirm-panel .hint { display: block; font-size: 1.8vmin; color: #666; margin-top: 0.5vmin; }
+  #btn-newmatch { background: #28a745; color: #fff; font-size: 2.8vmin; padding: 1vmin 2.5vmin; margin: 0.5vmin; }
+
+  /* Spieler */
+  #players {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1vmin 4vmin; font-size: 6vmin; font-weight: bold;
+    position: relative; z-index: 5;
+  }
+  .player-box { flex: 1; text-align: center; }
+  .player-left { color: red; }
+  .player-right { color: blue; }
+  .edit-btn { font-size: 2.5vmin; margin-top: 1vmin; cursor: pointer; }
+
+  /* Score Hauptbereich */
+  #scores {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    flex: 1 1 auto; min-height: 20vh; position: relative; z-index: 1;
+  }
+  .score {
+    display: flex; justify-content: center; align-items: center;
+    font-size: 30vmin; font-weight: bold; user-select: none; cursor: pointer;
+  }
+  #s1 { color: red; }
+  #s2 { color: blue; }
+  #colon { font-size: 12vmin; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+
+  /* Untere Leiste (wie 14.1): Undo links, Seitenwechsel mittig */
+  #bottom-bar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1vmin;
+    padding: 0.4vmin 1.5vmin 1vmin 1.5vmin;
+    position: relative;
+    z-index: 10;
+    flex: 0 0 auto;
+  }
+  #bottom-bar button { margin: 0; }
+  .bb-left, .bb-right { display: flex; align-items: flex-end; gap: 0.6vmin; flex: 0 0 auto; min-width: 18vmin; }
+  .bb-center { display: flex; align-items: flex-end; justify-content: center; gap: 1vmin; }
+  #undoBtn { font-size: 2.7vmin; padding: 0.9vmin 1.8vmin; border: 1px solid #666; }
+  /* Seitenwechsel 20% kleiner als Standardbuttons */
+  #btn-swap { font-size: 2.8vmin; padding: 1.2vmin 2vmin; }
+
+  /* Hilfe-Overlay (Inhalt folgt spaeter) – Optik wie 14.1 */
+  #help-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55);
+    z-index: 135; align-items: center; justify-content: center; padding: 2vmin; }
+  #help-card { background: #fff; color: #222; width: 100%; max-width: 680px; max-height: 92vh;
+    border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 12px 40px rgba(0,0,0,.4); font-family: Arial, sans-serif; }
+  #help-head { background: #1f3b73; color: #fff; display: flex; align-items: center;
+    justify-content: space-between; padding: 10px 14px; }
+  #help-title { font-size: 18px; font-weight: bold; }
+  #help-head button { background: rgba(255,255,255,.16); color: #fff; border: none;
+    border-radius: 7px; padding: 6px 11px; font-size: 14px; margin: 0; cursor: pointer; }
+  #help-head-actions { display: flex; align-items: center; gap: 8px; }
+  #help-head #breakModeBtn { background: #3461a8; font-weight: bold; font-size: 13px; border: 1px solid transparent; }
+  #help-head #breakModeBtn.on { border-color: #ffd27f; }
+  #help-body { overflow-y: auto; padding: 4px 18px 16px; font-size: 15px; line-height: 1.5;
+    color: #222; min-height: 18vh; }
+  #help-body h3 { color: #1f3b73; font-size: 15px; margin: 14px 0 4px; }
+  #help-body ul { margin: 4px 0; padding-left: 20px; }
+  #help-body li { margin: 3px 0; }
+  #help-body p { margin: 4px 0; }
+  .ball-ico { vertical-align: -4px; margin-right: 2px; }
+
+  button {
+    font-size: 3.5vmin; padding: 1.5vmin 2.5vmin; margin: 1vmin;
+    border-radius: 1vmin; border: none; background: #f0f0f0; cursor: pointer;
+  }
+  button:disabled { opacity: 0.4; }
+</style>
+
+<script>
+  /* Eigene Dialoge (Ersatz fuer alert/confirm/prompt) – inline, damit die Datei eigenstaendig ist. */
+  (function () {
+    const style = document.createElement('style');
+    style.textContent =
+      '.app-dlg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:99999;}' +
+      '.app-dlg-box{background:#fff;color:#333;border-radius:10px;padding:22px 24px;max-width:460px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.35);font-family:Arial,sans-serif;}' +
+      '.app-dlg-box .app-dlg-title{font-weight:bold;color:#1f3b73;font-size:16px;margin-bottom:10px;}' +
+      '.app-dlg-box .app-dlg-msg{white-space:pre-wrap;font-size:15px;line-height:1.5;}' +
+      '.app-dlg-box .app-dlg-input{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;margin-top:12px;box-sizing:border-box;}' +
+      '.app-dlg-box .app-dlg-actions{text-align:right;margin-top:18px;}' +
+      '.app-dlg-box .app-dlg-actions button{margin-left:8px;}' +
+      '.app-dlg-box button{background:#1f3b73;color:#fff;border:none;padding:9px 22px;border-radius:7px;font-weight:bold;font-size:14px;cursor:pointer;}' +
+      '.app-dlg-box button:hover{background:#16294f;}' +
+      '.app-dlg-box button.app-dlg-cancel{background:#6c757d;}' +
+      '.app-dlg-box button.app-dlg-cancel:hover{background:#5a6268;}';
+    (document.head || document.documentElement).appendChild(style);
+
+    function buildOverlay(innerHTML) {
+      const ov = document.createElement('div');
+      ov.className = 'app-dlg-overlay';
+      ov.innerHTML = '<div class="app-dlg-box" role="dialog" aria-modal="true">' + innerHTML + '</div>';
+      document.body.appendChild(ov);
+      return ov;
+    }
+
+    const TITLE = '<div class="app-dlg-title">🎱 8/9/10-Ball Scoreboard</div>';
+
+    window.alert = function (msg) {
+      const ov = buildOverlay(TITLE +
+        '<div class="app-dlg-msg"></div>' +
+        '<div class="app-dlg-actions"><button type="button" class="app-dlg-ok">OK</button></div>');
+      ov.querySelector('.app-dlg-msg').textContent = String(msg == null ? '' : msg);
+      const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+      function onKey(e) { if (e.key === 'Escape' || e.key === 'Enter') close(); }
+      ov.querySelector('.app-dlg-ok').addEventListener('click', close);
+      ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+      document.addEventListener('keydown', onKey);
+      ov.querySelector('.app-dlg-ok').focus();
+    };
+
+    window.confirmModal = function (msg) {
+      return new Promise((resolve) => {
+        const ov = buildOverlay(TITLE +
+          '<div class="app-dlg-msg"></div>' +
+          '<div class="app-dlg-actions">' +
+          '<button type="button" class="app-dlg-cancel">Abbrechen</button>' +
+          '<button type="button" class="app-dlg-ok">OK</button></div>');
+        ov.querySelector('.app-dlg-msg').textContent = String(msg == null ? '' : msg);
+        const done = (val) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+        function onKey(e) { if (e.key === 'Escape') done(false); else if (e.key === 'Enter') done(true); }
+        ov.querySelector('.app-dlg-ok').addEventListener('click', () => done(true));
+        ov.querySelector('.app-dlg-cancel').addEventListener('click', () => done(false));
+        ov.addEventListener('click', (e) => { if (e.target === ov) done(false); });
+        document.addEventListener('keydown', onKey);
+        ov.querySelector('.app-dlg-ok').focus();
+      });
+    };
+
+    window.promptModal = function (msg, vorgabe, opts) {
+      opts = opts || {};
+      return new Promise((resolve) => {
+        const ov = buildOverlay(TITLE +
+          '<div class="app-dlg-msg"></div>' +
+          '<input type="text" class="app-dlg-input">' +
+          '<div class="app-dlg-actions">' +
+          '<button type="button" class="app-dlg-cancel">Abbrechen</button>' +
+          '<button type="button" class="app-dlg-ok">OK</button></div>');
+        ov.querySelector('.app-dlg-msg').textContent = String(msg == null ? '' : msg);
+        const inp = ov.querySelector('.app-dlg-input');
+        inp.value = vorgabe == null ? '' : String(vorgabe);
+        if (opts.maxLength) inp.maxLength = opts.maxLength;
+        if (opts.numeric) {
+          inp.inputMode = 'numeric';
+          inp.addEventListener('input', () => {
+            let v = inp.value.replace(/\D/g, '');
+            if (opts.maxLength) v = v.slice(0, opts.maxLength);
+            inp.value = v;
+          });
+        }
+        const done = (val) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+        function onKey(e) { if (e.key === 'Escape') done(null); }
+        ov.querySelector('.app-dlg-ok').addEventListener('click', () => done(inp.value));
+        ov.querySelector('.app-dlg-cancel').addEventListener('click', () => done(null));
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); done(inp.value); } });
+        ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
+        document.addEventListener('keydown', onKey);
+        setTimeout(() => { inp.focus(); inp.select(); }, 30);
+      });
+    };
+  })();
+</script>
+</head>
+
+<body>
+
+<div id="header">
+  <div class="hdr-left">
+    <button id="home-btn" type="button" title="Zur Startseite" onclick="window.location.href='index.html'">🏠</button>
+    <button id="helpBtn" class="hdr-btn" type="button">❓ Hilfe</button>
+  </div>
+  <div id="hdr-title">8/9/10-Ball SCOREBOARD</div>
+  <div class="hdr-right">
+    <button id="btn-newgame" class="hdr-btn" type="button" onclick="newGame()">🔄 Neues Match</button>
+    <div id="clock"></div>
+  </div>
+</div>
+
+<div id="break-info">
+  <span id="break-text">Next Break: Rot</span>
+</div>
+
+<div id="pool-target">
+  Race to: <span id="raceToVal">—</span>
+  <button id="raceToBtn" type="button" onclick="setRaceTo()">⚙️</button>
+</div>
+
+<div id="players">
+  <div class="player-box">
+    <div id="p1" class="player-left">Spieler 1</div>
+    <button class="edit-btn" type="button" onclick="changeName(1)">✏️</button>
+  </div>
+
+  <div class="player-box">
+    <div id="p2" class="player-right">Spieler 2</div>
+    <button class="edit-btn" type="button" onclick="changeName(2)">✏️</button>
+  </div>
+</div>
+
+<div id="scores">
+  <div id="s1" class="score">0</div>
+  <div id="colon">:</div>
+  <div id="s2" class="score">0</div>
+</div>
+
+<div id="confirm-panel">
+  <div id="confirm-text"></div>
+  <button id="btn-newmatch" type="button" onclick="newGame()">🔄 Neues Match</button>
+  <span class="hint">Falsch gezählt? Mit ↩️ Undo korrigieren.</span>
+</div>
+
+<div id="bottom-bar">
+  <div class="bb-left">
+    <button id="undoBtn" type="button">↩️ Undo</button>
+  </div>
+  <div class="bb-center">
+    <button id="btn-swap" type="button" onclick="swap()">↔ Seitenwechsel</button>
+  </div>
+  <div class="bb-right"></div>
+</div>
+
+<!-- Hilfe-Overlay (Inhalt folgt spaeter) -->
+<div id="help-overlay">
+  <div id="help-card">
+    <div id="help-head">
+      <div id="help-title">❓ Regeln – 8/9/10-Ball (Kurzfassung)</div>
+      <div id="help-head-actions">
+        <button id="breakModeBtn" type="button" title="Break-Modus umschalten">Wechsel-Break</button>
+        <button id="helpCloseBtn" type="button">✕ Schließen</button>
+      </div>
+    </div>
+    <div id="help-body">
+      <p>💡 <b>Tipp:</b> Zum Lernen der Regeln das Regelwerk lesen und einen erfahrenen Spieler fragen.</p>
+
+      <h3>Allgemeine Regeln (für 8-, 9- und 10-Ball)</h3>
+      <ul>
+        <li><b>Anstoß:</b> Der Spielball liegt frei im <b>Kopffeld</b>. Beim Break muss eine Kugel fallen oder mindestens 4 Objektkugeln eine Bande berühren.</li>
+        <li><b>Korrekter Stoß:</b> Nach dem Kontakt muss mindestens eine Kugel eine Bande berühren oder versenkt werden.</li>
+        <li>⚠ <b>Strafe bei Foul:</b> Der Gegner erhält Ball in Hand auf dem gesamten Tisch (Ausnahme: 8-Ball-Anstoß, siehe unten).</li>
+        <li>⚠ <b>Standardfouls:</b> Weiße fällt in eine Tasche oder springt vom Tisch · keine Kugel getroffen · keine Bande nach dem Ballkontakt · Kugel mit Körper, Kleidung oder Queue berührt.</li>
+      </ul>
+
+      <div style="font-size:12px;color:#666;margin:12px 0 4px;font-weight:bold;">Orientierung am Tisch</div>
+      <svg viewBox="0 0 360 196" width="100%" role="img" aria-label="Tisch mit Kopffeld, Kopflinie, Kopfpunkt, Mittelpunkt, Fußpunkt und Aufbaudreieck">
+        <rect x="4" y="4" width="352" height="188" rx="12" fill="#5a3618"/>
+        <rect x="18" y="18" width="324" height="160" rx="6" fill="#1f7a4d"/>
+        <circle cx="18" cy="18" r="7" fill="#141414"/><circle cx="180" cy="18" r="7" fill="#141414"/><circle cx="342" cy="18" r="7" fill="#141414"/>
+        <circle cx="18" cy="178" r="7" fill="#141414"/><circle cx="180" cy="178" r="7" fill="#141414"/><circle cx="342" cy="178" r="7" fill="#141414"/>
+        <line x1="99" y1="18" x2="99" y2="178" stroke="#eafff5" stroke-width="1" stroke-dasharray="4 3" opacity="0.7"/>
+        <polygon points="261,98 320,68 320,128" fill="rgba(255,255,255,.08)" stroke="#eafff5" stroke-width="1" stroke-dasharray="3 3" opacity="0.85"/>
+        <circle cx="261" cy="98" r="2.8" fill="#ffd27f"/>
+        <circle cx="99" cy="98" r="2.8" fill="#eafff5"/>
+        <circle cx="180" cy="98" r="2.8" fill="#eafff5"/>
+        <g font-family="Arial" font-size="10" fill="#eafff5" text-anchor="middle">
+          <text x="261" y="86">Fußpunkt</text>
+          <text x="99" y="86">Kopfpunkt</text>
+          <text x="180" y="86">Mittelpunkt</text>
+          <text x="99" y="33">Kopflinie</text>
+          <text x="56" y="160">Kopffeld</text>
+          <text x="291" y="150">Dreieck</text>
+        </g>
+      </svg>
+
+      <h3 style="border-top:1px solid #eee;padding-top:14px;margin-top:16px;"><svg class="ball-ico" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#111"/><circle cx="10" cy="10" r="5.2" fill="#fdfdf2"/><text x="10" y="12.5" font-size="6.5" text-anchor="middle" fill="#111" font-weight="bold" font-family="Arial">8</text></svg> 8-Ball (Ansagespiel)</h3>
+      <ul>
+        <li><b>Ziel:</b> Ein Spieler spielt die „Vollen", der andere die „Halben". Wer zuerst alle eigenen Kugeln und danach die schwarze <b>8</b> korrekt versenkt, gewinnt.</li>
+        <li><b>Aufbau:</b> Vorderste Kugel auf dem Fußpunkt, die 8 in der Mitte; in den hinteren Ecken je eine Volle und eine Halbe.</li>
+        <li><b>Spielablauf:</b> Vor dem Stoß ansagen, welche Kugel in welche Tasche (außer beim Anstoß). Die Weiße trifft zuerst eine Kugel der eigenen Gruppe (Ausnahme: offener Tisch).</li>
+        <li><b>Offener Tisch:</b> Nach dem Anstoß ist der Tisch offen; die Gruppenwahl entscheidet der erste angesagte, korrekte Treffer.</li>
+        <li><b>Fehlstoß:</b> Fällt eine Kugel anders oder unangesagt, wechselt die Aufnahme – die Kugel bleibt im Loch.</li>
+        <li>⚠ <b>Spezielle Fouls:</b> Weiße trifft zuerst eine gegnerische Kugel oder die 8.</li>
+        <li><b>Anstoß-Foul (Ausnahme):</b> Ball in Hand nur im <b>Kopffeld</b>, und es dürfen nur Kugeln außerhalb des Kopffelds angespielt werden.</li>
+        <li><b>Partieverlust:</b> Die 8 fällt, obwohl noch eigene Kugeln liegen · die 8 fällt in eine nicht angesagte Tasche · die 8 wird beim Foul mitversenkt · die 8 springt vom Tisch. (Fällt die 8 beim Anstoß, wird sie wieder aufgebaut oder neu angestoßen.)</li>
+      </ul>
+
+      <h3><svg class="ball-ico" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><clipPath id="b9c"><circle cx="10" cy="10" r="9"/></clipPath><g clip-path="url(#b9c)"><rect x="0" y="0" width="20" height="20" fill="#fdfdf2"/><rect x="0" y="5.5" width="20" height="9" fill="#f6c411"/></g><circle cx="10" cy="10" r="9" fill="none" stroke="#d9d9c8" stroke-width="0.7"/><circle cx="10" cy="10" r="5.2" fill="#fdfdf2"/><text x="10" y="12.5" font-size="6.5" text-anchor="middle" fill="#111" font-weight="bold" font-family="Arial">9</text></svg> 9-Ball (kein Ansagespiel)</h3>
+      <ul>
+        <li><b>Ziel:</b> Wer die <b>9</b> korrekt versenkt, gewinnt.</li>
+        <li><b>Aufbau:</b> Als Raute – die 1 vorne auf dem Fußpunkt, die 9 in der Mitte, der Rest beliebig.</li>
+        <li><b>Spielablauf:</b> Kein Ansagespiel – jeder korrekt versenkte Ball zählt. Die Weiße muss immer zuerst die Kugel mit der niedrigsten Nummer treffen.</li>
+        <li><b>Anstoß:</b> Die 1 muss zuerst getroffen werden.</li>
+        <li><b>Push Out:</b> Direkt nach korrektem Anstoß ansagbar – keine Banden-/Kugelberührung nötig. Der Gegner spielt weiter oder gibt die Aufnahme zurück.</li>
+        <li>⚠ <b>Spezielle Fouls:</b> Weiße trifft nicht zuerst die niedrigste Kugel. Versenkte Objektkugeln bleiben in den Taschen (Ausnahme: die 9 wird wieder aufgesetzt).</li>
+        <li><b>Partieende:</b> Gewonnen, wenn die 9 bei korrektem Stoß fällt (auch per Kombination). Verloren bei drei Fouls in Folge (das dritte muss vorher angekündigt werden).</li>
+      </ul>
+
+      <h3><svg class="ball-ico" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><clipPath id="b10c"><circle cx="10" cy="10" r="9"/></clipPath><g clip-path="url(#b10c)"><rect x="0" y="0" width="20" height="20" fill="#fdfdf2"/><rect x="0" y="5.5" width="20" height="9" fill="#1958a8"/></g><circle cx="10" cy="10" r="9" fill="none" stroke="#d9d9c8" stroke-width="0.7"/><circle cx="10" cy="10" r="5.2" fill="#fdfdf2"/><text x="10" y="12.4" font-size="5.4" text-anchor="middle" fill="#111" font-weight="bold" font-family="Arial">10</text></svg> 10-Ball (Ansagespiel)</h3>
+      <ul>
+        <li><b>Ziel:</b> Wer die <b>10</b> korrekt versenkt, gewinnt.</li>
+        <li><b>Aufbau:</b> Als Dreieck – die 1 vorne auf dem Fußpunkt, die 10 in der Mitte, die 2 und 3 in den hinteren Ecken.</li>
+        <li><b>Spielablauf:</b> Reines Ansagespiel – Kugel und Tasche vor dem Stoß benennen (außer beim Anstoß). Die Weiße muss immer zuerst die niedrigste Kugel treffen.</li>
+        <li><b>Anstoß:</b> Die 1 muss zuerst getroffen werden.</li>
+        <li><b>Fehlstoß:</b> Trifft die angesagte Kugel die falsche Tasche oder fällt eine unangesagte Kugel, darf der Gegner übernehmen oder weiterspielen lassen.</li>
+        <li><b>Push Out:</b> Direkt nach korrektem Anstoß ansagbar – keine Banden-/Kugelberührung nötig.</li>
+        <li>⚠ <b>Spezielle Fouls:</b> Weiße trifft nicht zuerst die niedrigste Kugel. Versenkte Objektkugeln bleiben in den Taschen (Ausnahme: die 10 wird wieder aufgesetzt).</li>
+        <li><b>Partieende:</b> Gewonnen, wenn die 10 als letzte verbleibende Kugel korrekt angesagt und versenkt wird. Verloren bei drei Fouls in Folge.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* =====================================================================
+     8-9-10 Scoreboard – STANDALONE (ohne Firebase / Turnier)
+     Spielstand wird lokal im Browser (localStorage) gespeichert.
+     ===================================================================== */
+
+  const LS_KEY = "billardpool_standalone";
+
+  function freshState() {
+    return { player1: "Spieler 1", player2: "Spieler 2", score1: 0, score2: 0, nextBreak: 1, breakMode: "alternating", raceTo: 0 };
+  }
+  let state = freshState();
+
+  function save() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && typeof p === "object") state = Object.assign(freshState(), p);
+      }
+    } catch (e) {}
+  }
+
+  function updateBreakDisplay() {
+    const el = document.getElementById("break-text");
+    el.style.color = state.nextBreak === 1 ? "red" : "blue";
+    el.textContent = "Next Break: " + (state.nextBreak === 1 ? "Rot" : "Blau");
+    if ((state.breakMode || "alternating") === "winner") {
+      const sfx = document.createElement("span");
+      sfx.textContent = " · Winner-Break";
+      sfx.style.cssText = "color:#8a5a12;font-size:0.7em;";
+      el.appendChild(sfx);
+    }
+  }
+
+  function updateBreakModeBtn() {
+    const btn = document.getElementById("breakModeBtn");
+    if (!btn) return;
+    const winner = (state.breakMode || "alternating") === "winner";
+    btn.textContent = winner ? "Winner-Break" : "Wechsel-Break";
+    btn.classList.toggle("on", winner);
+  }
+
+  function render() {
+    document.getElementById("p1").textContent = state.player1;
+    document.getElementById("p2").textContent = state.player2;
+    document.getElementById("s1").textContent = state.score1;
+    document.getElementById("s2").textContent = state.score2;
+    updateBreakDisplay();
+    updateBreakModeBtn();
+    document.getElementById("raceToVal").textContent = state.raceTo > 0 ? state.raceTo : "—";
+    const over = matchOver();
+    document.getElementById("confirm-panel").style.display = over ? "block" : "none";
+    if (over) {
+      const w = state.score1 > state.score2 ? state.player1 : state.player2;
+      document.getElementById("confirm-text").textContent = `🏁 ${w} gewinnt ${state.score1}:${state.score2}`;
+    }
+  }
+
+  // Anstossrecht wechselt nach jedem gewerteten Punkt (wie im Online-Board).
+  function toggleBreak() { state.nextBreak = (state.nextBreak === 1 ? 2 : 1); }
+
+  // Ausspielziel (Race to) – optional; erreicht = Spiel gewonnen
+  function matchOver() { const r = state.raceTo || 0; return r > 0 && (state.score1 >= r || state.score2 >= r); }
+  async function setRaceTo() {
+    const v = await promptModal("Race to (Sätze; leer = kein Ziel):", state.raceTo || '', { maxLength: 3, numeric: true });
+    if (v === null) return;
+    const n = parseInt(v, 10);
+    state.raceTo = (!isNaN(n) && n > 0) ? n : 0;
+    save(); render();
+  }
+
+  /* Verlauf fuer Undo (ersetzt die -1-Buttons) */
+  let history = [];
+  function pushHistory() { history.push(JSON.stringify(state)); }
+  function undo() {
+    if (history.length === 0) return;
+    state = JSON.parse(history.pop());
+    save(); render();
+  }
+
+  function add(player) {
+    if (matchOver()) return;   // Ausspielziel bereits erreicht -> gesperrt
+    pushHistory();
+    if (player === 1) state.score1++; else state.score2++;
+    if ((state.breakMode || "alternating") === "winner") state.nextBreak = player;  // Winner-Break: Gewinner bricht
+    else toggleBreak();                                                             // Wechsel-Break (Default)
+    save(); render();
+  }
+
+  function swap() {
+    pushHistory();
+    [state.player1, state.player2] = [state.player2, state.player1];
+    [state.score1, state.score2] = [state.score2, state.score1];
+    save(); render();
+  }
+
+  async function changeName(player) {
+    const name = (await promptModal("Neuer Name:") || '').trim();
+    if (!name) return;
+    if (player === 1) state.player1 = name; else state.player2 = name;
+    save(); render();
+  }
+
+  async function newGame() {
+    if (!await confirmModal("Neues Match starten (Punkte zurücksetzen)?")) return;
+    state.score1 = 0;
+    state.score2 = 0;
+    state.nextBreak = 1;
+    state.breakMode = "alternating";   // Break-Modus faellt bei neuem Match auf Standard zurueck
+    if (await confirmModal("Spieler neu eingeben?")) {
+      state.player1 = (await promptModal("Name Spieler Rot:", state.player1) || state.player1).trim() || state.player1;
+      state.player2 = (await promptModal("Name Spieler Blau:", state.player2) || state.player2).trim() || state.player2;
+    }
+    save(); render();
+  }
+
+  // onclick-Handler aus dem HTML global verfuegbar machen
+  window.swap = swap;
+  window.changeName = changeName;
+  window.newGame = newGame;
+  window.setRaceTo = setRaceTo;
+
+  // Klick auf die grossen Zaehler = +1
+  document.getElementById("s1").addEventListener("click", () => add(1));
+  document.getElementById("s2").addEventListener("click", () => add(2));
+
+  // Undo (unten links) – ersetzt die -1-Buttons
+  document.getElementById("undoBtn").addEventListener("click", undo);
+
+  // Hilfe-Overlay (Inhalt folgt spaeter)
+  document.getElementById("helpBtn").addEventListener("click", () => {
+    document.getElementById("help-overlay").style.display = "flex";
+  });
+  document.getElementById("helpCloseBtn").addEventListener("click", () => {
+    document.getElementById("help-overlay").style.display = "none";
+  });
+
+  // Break-Modus umschalten (Wechsel- <-> Winner-Break)
+  document.getElementById("breakModeBtn").addEventListener("click", () => {
+    state.breakMode = ((state.breakMode || "alternating") === "winner") ? "alternating" : "winner";
+    save(); render();
+  });
+
+  function updateClock() {
+    document.getElementById("clock").textContent =
+      new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  }
+  setInterval(updateClock, 1000);
+
+  /* Start */
+  load();
+  render();
+  updateClock();
+</script>
+
+<script>
+  // Screen Wake Lock – haelt den Bildschirm an (Kiosk). Inline-Variante fuer das
+  // Standalone-Bundle (kein ES-Modul; vgl. js/wake-lock.js im Haupt-Repo).
+  (function () {
+    if (!('wakeLock' in navigator)) return;
+    var lock = null;
+    var acquire = function () {
+      if (lock || document.visibilityState !== 'visible') return;
+      navigator.wakeLock.request('screen').then(function (l) {
+        lock = l;
+        l.addEventListener('release', function () { lock = null; });
+      }).catch(function () { lock = null; });
+    };
+    acquire();
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') acquire();
+    });
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) {
+      document.addEventListener(ev, acquire, { passive: true });
+    });
+    setInterval(acquire, 30000);
+  })();
+</script>
+
+</body>
+</html>

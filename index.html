@@ -1,392 +1,71 @@
 <!DOCTYPE html>
+<!--
+  Billard-Turnier — Standalone-Scoreboards (Startseite)
+  Copyright (c) 2026 Matthias Haas
+  SPDX-License-Identifier: MIT
+  Lizenz: MIT — siehe LICENSE im selben Ordner (https://opensource.org/licenses/MIT)
+-->
 <html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Paarungen zählen</title>
-<style>
-  :root {
-    --bg: #E9EBEE;
-    --surface: #FFFFFF;
-    --ink: #15171C;
-    --muted: #71767E;
-    --line: #D2D6DC;
-    --warn: #A32B2B;
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  }
-
-  * { box-sizing: border-box; }
-
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: var(--sans);
-    -webkit-font-smoothing: antialiased;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .wrap { max-width: 780px; margin: 0 auto; padding: 34px 20px 56px; }
-
-  /* Kopfbereich */
-  .top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 20px;
-    padding-bottom: 18px;
-    border-bottom: 1px solid var(--line);
-    margin-bottom: 30px;
-  }
-  h1 {
-    margin: 0;
-    font-size: 1.55rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .sub { margin: 6px 0 0; font-size: 0.86rem; color: var(--muted); }
-  .totalbox { text-align: right; flex: none; }
-  .totallabel {
-    display: block;
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .totalnum {
-    display: block;
-    font-family: var(--mono);
-    font-size: 2.2rem;
-    font-weight: 600;
-    line-height: 1.05;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* Gruppe pro erstgenanntem Spieler */
-  .row { margin-bottom: 26px; }
-  .rowname {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 0 0 10px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--c);
-  }
-  .rowname::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--c);
-    opacity: 0.28;
-  }
-
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-  /* Karte */
-  .card {
-    position: relative;
-    background: var(--surface);
-    border-radius: 6px;
-    border-top: 3px solid var(--c);
-    box-shadow: 0 1px 2px rgba(21, 23, 28, 0.08);
-  }
-  .plus {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    width: 100%;
-    padding: 16px 18px 14px;
-    border: 0;
-    border-radius: 0 0 6px 6px;
-    background: transparent;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: background-color 0.12s ease;
-  }
-  .plus:hover { background: color-mix(in srgb, var(--c) 6%, transparent); }
-  .plus:active { background: color-mix(in srgb, var(--c) 11%, transparent); }
-  .plus:focus-visible { outline: 2px solid var(--c); outline-offset: -3px; }
-
-  .vs {
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .opp { font-size: 1.1rem; font-weight: 650; letter-spacing: -0.01em; }
-  .num {
-    margin-top: 4px;
-    font-family: var(--mono);
-    font-size: 2.9rem;
-    font-weight: 600;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    transition: transform 0.14s ease;
-  }
-  .num.zero { color: #C2C6CC; }
-  .num.tick { transform: scale(1.1); }
-
-  /* Strichliste */
-  .tally {
-    display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    gap: 5px 9px;
-    min-height: 21px;
-    margin-top: 8px;
-    color: var(--c);
-  }
-  .tally svg { display: block; }
-
-  .minus {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 34px;
-    height: 28px;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    background: var(--surface);
-    color: var(--muted);
-    font: 600 0.8rem/1 var(--sans);
-    cursor: pointer;
-    transition: color 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
-  }
-  .minus:hover { color: var(--c); border-color: var(--c); }
-  .minus:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
-  .minus:disabled { opacity: 0.22; cursor: default; }
-
-  /* Fuß */
-  .foot {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-top: 32px;
-    padding-top: 18px;
-    border-top: 1px solid var(--line);
-  }
-  .reset {
-    padding: 9px 15px;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    background: transparent;
-    color: var(--muted);
-    font: 600 0.85rem/1 var(--sans);
-    cursor: pointer;
-    transition: color 0.12s ease, border-color 0.12s ease;
-  }
-  .reset:hover { color: var(--warn); border-color: var(--warn); }
-  .reset:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
-  .reset.armed { color: #fff; background: var(--warn); border-color: var(--warn); }
-  .hint { font-size: 0.85rem; color: var(--muted); }
-
-  @media (max-width: 560px) {
-    .grid { grid-template-columns: 1fr; }
-    .num { font-size: 2.5rem; }
-    .top { align-items: flex-start; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
-    .num.tick { transform: none; }
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="theme-color" content="#0d88d0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+  <title>Billard-Scoreboards</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%231a1a1a'/%3E%3Ccircle cx='24' cy='22' r='8' fill='%23ffffff' opacity='0.18'/%3E%3Ccircle cx='32' cy='32' r='15' fill='%23fdfdf2'/%3E%3Ctext x='32' y='39' font-family='Arial, Helvetica, sans-serif' font-size='22' font-weight='bold' fill='%23111' text-anchor='middle'%3E8%3C/text%3E%3C/svg%3E">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif; color: #fff;
+      margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 4vmin;
+      touch-action: manipulation;
+      /* "Ocean Blue" Billardtuch (Z9 Billiard Cloth): Farbe + diagonale Koeperbindung
+         (zwei Verlaeufe) + Stoff-Koernung (SVG-Rauschen inline) + Vignette */
+      background-color: #0d88d0;
+      background-image:
+        radial-gradient(135% 120% at 50% 28%, rgba(255,255,255,.05), rgba(0,0,0,0) 58%, rgba(0,0,0,.18)),
+        repeating-linear-gradient(45deg,  rgba(255,255,255,.045) 0 1px, rgba(255,255,255,0) 1px 4px),
+        repeating-linear-gradient(135deg, rgba(0,0,0,.05) 0 1px, rgba(0,0,0,0) 1px 4px),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='cloth'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23cloth)' opacity='0.30'/%3E%3C/svg%3E");
+      background-size: cover, 4px 4px, 4px 4px, 220px 220px;
+      background-repeat: no-repeat, repeat, repeat, repeat;
+      background-blend-mode: normal, normal, normal, soft-light;
+      background-attachment: fixed;
+    }
+    h1 { font-size: 6vmin; margin: 0 0 1vmin; text-align: center; text-shadow: 0 0.3vmin 0.8vmin rgba(0,0,0,.40); }
+    .sub { color: #eaf3fb; font-size: 3vmin; margin-bottom: 6vmin; text-align: center; text-shadow: 0 0.2vmin 0.6vmin rgba(0,0,0,.35); }
+    .boards { display: flex; gap: 4vmin; flex-wrap: wrap; justify-content: center; }
+    .board-btn {
+      font-size: 4.5vmin; font-weight: bold; padding: 4vmin 6vmin; border-radius: 2vmin;
+      border: none; cursor: pointer; color: #fff; line-height: 1.2;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 1.2vmin;
+    }
+    /* Tuch-Sponsor (unten rechts) – transparentes Logo direkt auf dem Tuch */
+    .z9-badge { position: fixed; right: 3vmin; bottom: 3vmin; display: flex; align-items: center; }
+    .z9-badge svg { width: 4.25vmin; height: 4.25vmin; display: block; filter: drop-shadow(0 0.2vmin 0.45vmin rgba(0,0,0,.45)); }
+  </style>
 </head>
 <body>
-  <div class="wrap">
-    <header class="top">
-      <div>
-        <h1>Kämpfe zählen</h1>
-        <p class="sub">Karte anklicken zählt hoch, &minus;1 korrigiert.</p>
-      </div>
-      <div class="totalbox">
-        <span class="totallabel">Gesamt</span>
-        <span class="totalnum" id="total">0</span>
-      </div>
-    </header>
 
-    <div id="rows"></div>
+  <h1>🎱 Tablet-Startseite</h1>
+  <div class="sub">Scoreboard öffnen</div>
 
-    <footer class="foot">
-      <button type="button" class="reset" id="reset">Alles zurücksetzen</button>
-      <span class="hint" id="hint" role="status"></span>
-    </footer>
+  <div class="boards">
+    <a class="board-btn" style="background:#e67e22" href="index_pool.html">🎱 8/9/10-Ball</a>
+    <a class="board-btn" style="background:#27ae60" href="index141.html">🎯 14.1 endlos</a>
   </div>
 
-<script>
-(function () {
-  "use strict";
+  <!-- Tuch-Sponsor: Z9 Billiard Cloth (Tuch "Ocean Blue") -->
+  <div class="z9-badge" title="Tuch-Sponsor: Z9 Billiard Cloth - Ocean Blue">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" aria-hidden="true">
+      <path d="M 86.8 313.1 A 160 160 0 1 1 313.1 313.1" fill="none" stroke="#1E7B38" stroke-width="8" stroke-linecap="round" />
+      <text x="200" y="245" font-family="Georgia, 'Times New Roman', serif" font-size="190" font-weight="bold" font-style="italic" text-anchor="middle" fill="#000000">Z9</text>
+      <text x="315" y="355" font-family="Arial, sans-serif" font-size="22" text-anchor="middle" fill="#000000">&#174;</text>
+    </svg>
+  </div>
 
-  var PLAYERS = [
-    { name: "M.S.",   color: "#2B5F8E" },
-    { name: "M.H.", color: "#8C3C5E" },
-    { name: "K.J.",  color: "#3E7052" }
-  ];
-
-  var counts = {};
-  var els = {};
-  var rowsEl = document.getElementById("rows");
-  var totalEl = document.getElementById("total");
-  var hintEl = document.getElementById("hint");
-  var resetBtn = document.getElementById("reset");
-
-  function key(a, b) { return a + " vs. " + b; }
-
-  // Strichliste: Fünfergruppen aus vier Strichen plus Querstrich
-  function group(k) {
-    var lines = "";
-    var max = Math.min(k, 4);
-    for (var i = 0; i < max; i++) {
-      var x = 3 + i * 6;
-      lines += '<line x1="' + x + '" y1="2" x2="' + x + '" y2="19"/>';
-    }
-    var w = (k === 5) ? 25 : 3 + (k - 1) * 6 + 3;
-    if (k === 5) lines += '<line x1="1" y1="18" x2="24" y2="3"/>';
-    return '<svg width="' + w + '" height="21" viewBox="0 0 ' + w + ' 21" ' +
-           'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
-           lines + '</svg>';
-  }
-
-  function tally(n) {
-    if (n < 1) return "";
-    var capped = Math.min(n, 100);
-    var out = "";
-    var full = Math.floor(capped / 5);
-    var rest = capped % 5;
-    for (var i = 0; i < full; i++) out += group(5);
-    if (rest > 0) out += group(rest);
-    return out;
-  }
-
-  function render(k, animate) {
-    var n = counts[k];
-    var e = els[k];
-    e.num.textContent = n;
-    e.num.classList.toggle("zero", n === 0);
-    e.tally.innerHTML = tally(n);
-    e.minus.disabled = (n === 0);
-    if (animate) {
-      e.num.classList.remove("tick");
-      void e.num.offsetWidth;
-      e.num.classList.add("tick");
-      setTimeout(function () { e.num.classList.remove("tick"); }, 150);
-    }
-  }
-
-  function renderTotal() {
-    var sum = 0;
-    for (var k in counts) sum += counts[k];
-    totalEl.textContent = sum;
-  }
-
-  function bump(k, delta) {
-    var next = Math.max(0, counts[k] + delta);
-    if (next === counts[k]) return;
-    counts[k] = next;
-    render(k, delta > 0);
-    renderTotal();
-    disarm();
-  }
-
-  function makeCard(a, b) {
-    var k = key(a, b);
-    counts[k] = 0;
-
-    var card = document.createElement("div");
-    card.className = "card";
-
-    var plus = document.createElement("button");
-    plus.type = "button";
-    plus.className = "plus";
-    plus.setAttribute("aria-label", k + " – eins dazuzählen");
-    plus.innerHTML =
-      '<span class="vs">vs.</span>' +
-      '<span class="opp"></span>' +
-      '<span class="num zero" aria-hidden="true">0</span>' +
-      '<span class="tally" aria-hidden="true"></span>';
-    plus.querySelector(".opp").textContent = b;
-
-    var minus = document.createElement("button");
-    minus.type = "button";
-    minus.className = "minus";
-    minus.textContent = "\u22121";
-    minus.disabled = true;
-    minus.setAttribute("aria-label", k + " – eins abziehen");
-
-    card.appendChild(plus);
-    card.appendChild(minus);
-
-    els[k] = {
-      num: plus.querySelector(".num"),
-      tally: plus.querySelector(".tally"),
-      minus: minus
-    };
-
-    plus.addEventListener("click", function () { bump(k, 1); });
-    minus.addEventListener("click", function () { bump(k, -1); });
-
-    return card;
-  }
-
-  PLAYERS.forEach(function (p) {
-    var section = document.createElement("section");
-    section.className = "row";
-    section.style.setProperty("--c", p.color);
-
-    var h = document.createElement("h2");
-    h.className = "rowname";
-    h.textContent = p.name;
-    section.appendChild(h);
-
-    var grid = document.createElement("div");
-    grid.className = "grid";
-    PLAYERS.forEach(function (o) {
-      if (o.name !== p.name) grid.appendChild(makeCard(p.name, o.name));
-    });
-    section.appendChild(grid);
-
-    rowsEl.appendChild(section);
-  });
-
-  // Zurücksetzen in zwei Schritten
-  var armed = false;
-  var armTimer = null;
-
-  function disarm() {
-    if (!armed) return;
-    armed = false;
-    clearTimeout(armTimer);
-    resetBtn.textContent = "Alles zurücksetzen";
-    resetBtn.classList.remove("armed");
-  }
-
-  resetBtn.addEventListener("click", function () {
-    if (!armed) {
-      armed = true;
-      resetBtn.textContent = "Wirklich? Nochmal klicken";
-      resetBtn.classList.add("armed");
-      armTimer = setTimeout(disarm, 4000);
-      return;
-    }
-    disarm();
-    for (var k in counts) {
-      counts[k] = 0;
-      render(k, false);
-    }
-    renderTotal();
-    hintEl.textContent = "Alle Zähler stehen auf 0.";
-    setTimeout(function () { hintEl.textContent = ""; }, 3000);
-  });
-})();
-</script>
 </body>
 </html>
